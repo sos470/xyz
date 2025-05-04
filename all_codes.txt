@@ -1,0 +1,459 @@
+PB1:- RPC(Factorial)
+Client:
+import xmlrpc.client
+def main():
+    server=xmlrpc.client.ServerProxy('http://localhost:8000')
+    n=int(input("Enter the Number:"))
+    result = server.calculate_factorial(n)
+    print(result)
+if __name__ == '__main__':
+    main()
+
+Server:
+from xmlrpc.server import SimpleXMLRPCServer
+def factorial(n):
+    if n==0 or n==1:
+        return 1
+    else:
+        return n*factorial(n-1)
+server = SimpleXMLRPCServer(('localhost',8000))
+server.register_function(factorial,'calculate_factorial')
+server.serve_forever()
+
+
+
+
+PB2:- RPC(Arithmetic operation)
+Client:
+import xmlrpc.client
+def main():
+    server = xmlrpc.client.ServerProxy('http://localhost:8000')
+    print("Available operations: add, subtract, multiply, divide")
+    a = int(input("Enter first number: "))
+    b = int(input("Enter second number: "))
+    operation = input("Enter operation to perform: ").strip().lower()
+    result = server.perform_operation(a, b, operation)
+    print("Result:", result)
+if __name__ == '__main__':
+    main()
+
+Server:
+from xmlrpc.server import SimpleXMLRPCServer
+# Define arithmetic operations
+def arithmetic_operation(a, b, operation):
+    if operation == 'add':
+        return a + b
+    elif operation == 'subtract':
+        return a - b
+    elif operation == 'multiply':
+        return a * b
+    elif operation == 'divide':
+        if b == 0:
+            return "Error: Division by zero"
+        return a / b
+    else:
+        return "Error: Unsupported operation"
+# Set up XML-RPC server
+server = SimpleXMLRPCServer(('localhost', 8000))
+print("Server is running on port 8000...")
+# Register function with the server
+server.register_function(arithmetic_operation, 'perform_operation')
+# Start the server
+server.serve_forever()
+
+
+
+
+
+PB3:- RMI(String Concatenation)
+Client:
+import Pyro4
+uri = input("Enter URI of Server:")
+concatenator = Pyro4.Proxy(uri)
+str1 = input("Enter the string 1")
+str2 = input("Enter the string 2")
+result = concatenator.concatenate(str1, str2)
+print(result)
+
+Server:
+import Pyro4
+@Pyro4.expose
+class stringconcatenator:
+    def concatenate(self,str1,str2):
+        return str1+str2
+daemon=Pyro4.Daemon()
+uri=daemon.register(stringconcatenator)
+print(uri)
+daemon.requestLoop()
+
+
+
+PB4:- RMI(Palindrome)
+Client:
+import Pyro4
+# Get the URI printed from the server side
+uri = input("Enter URI of Server: ")
+checker = Pyro4.Proxy(uri)
+# Get input string from user
+user_input = input("Enter the string to check for palindrome: ")
+# Call remote method
+is_palindrome = checker.is_palindrome(user_input)
+
+# Print result
+if is_palindrome:
+    print("The string is a palindrome.")
+else:
+    print("The string is not a palindrome.")
+
+Server:
+import Pyro4
+@Pyro4.expose
+class PalindromeChecker:
+    def is_palindrome(self, input_str):
+        # Clean the string: remove spaces and convert to lowercase
+        cleaned = ''.join(c.lower() for c in input_str if c.isalnum())
+        return cleaned == cleaned[::-1]
+# Register the class as a Pyro object
+daemon = Pyro4.Daemon()
+uri = daemon.register(PalindromeChecker)
+print("URI to use in client:", uri)
+# Start the server loop
+daemon.requestLoop()
+
+
+
+PB5:- MapReduce(CharCount & WordCount)
+CharCount:
+from mrjob.job import MRJob
+class MRCharCount(MRJob):
+    def mapper(self, _, line):
+        for char in line.strip():
+            yield char, 1
+    def reducer(self, char, counts):
+        yield char, sum(counts)
+        
+if __name__ == '__main__':
+    MRCharCount.run()
+
+WordCount:
+from mrjob.job import MRJob
+import re
+WORD_REGEXP = re.compile(r"[\w']+")
+class MRWordCount(MRJob):
+    def mapper(self, _, line):
+        for word in WORD_REGEXP.findall(line):
+            yield word.lower(), 1 
+    def reducer(self, word, counts):
+        yield word, sum(counts)
+if __name__ == '__main__':
+    MRWordCount.run()
+
+
+
+PB6:- MapReduce(SentenceCount)
+SentenceCount:
+from mrjob.job import MRJob
+import re
+# Regular expression to detect sentence boundaries
+SENTENCE_END_REGEX = re.compile(r'[.!?]')
+class MRSentenceCount(MRJob):
+    def mapper(self, _, line):
+        # Split the line using sentence-ending punctuation marks
+        sentences = SENTENCE_END_REGEX.split(line)
+        # Count non-empty sentences (after stripping whitespace)
+        for sentence in sentences:
+            if sentence.strip():
+                yield "Sentence", 1
+    def reducer(self, key, values):
+        yield key, sum(values)
+
+if __name__ == '__main__':
+    MRSentenceCount.run()
+Input:
+Hello! My name is Omkar. How are you doing today? I hope everything is going well. 
+This is an example to test sentence counting. Let's see how many sentences are here!
+Mr. Smith is a good teacher. He teaches well. What time is it?
+Wow! That's amazing. Can you believe it?
+
+
+
+PB7:- MapReduce(UniqueWordCount)
+UniqueWordCount:
+from mrjob.job import MRJob
+import re
+WORD_RE = re.compile(r"[\w']+")
+class MRUniqueWordCount(MRJob):
+    def mapper(self, _, line):
+        for word in WORD_RE.findall(line):
+            yield word.lower(), None  # emit each word with dummy value
+    def reducer_init(self):
+        self.count = 0
+    def reducer(self, word, _):
+        self.count += 1  # count each unique word
+    def reducer_final(self):
+        yield "Unique Word Count", self.count
+    def steps(self):
+        return [self.mr(mapper=self.mapper,
+                        reducer_init=self.reducer_init,
+                        reducer=self.reducer,
+                        reducer_final=self.reducer_final)]
+if __name__ == '__main__':
+    MRUniqueWordCount.run()
+
+Input:
+Hello world! Hello again. This is a test file.
+World of code is vast. Code again and again!
+
+
+
+PB8:- Load Balancing Algorithm
+import random
+class Server:
+    def __init__(self, name):
+        self.name = name
+        self.active_connections = 0   
+class LoadBalancer:
+    def __init__(self, servers):
+        self.servers = [Server(s) for s in servers]
+        self.rr_index = 0
+    def random_selection(self):
+        return random.choice(self.servers)
+    def round_robin(self):
+        server = self.servers[self.rr_index % len(self.servers)]
+        self.rr_index += 1
+        return server
+    def least_connections(self):
+        return min(self.servers, key=lambda s: s.active_connections)
+    def assign_request(self,strategy):
+        if strategy == "random":
+            server = self.random_selection()
+        elif strategy == "round_robin":
+            server = self.round_robin()
+        elif strategy == "least_connections":
+            server = self.least_connections()
+        else:
+            raise ValueError("Invalid Strategy")
+            
+        server.active_connections += 1
+        print(f"{strategy.capitalize():<15} - Request -> {server.name} (Active: {server.active_connections})")
+        server.active_connections -= 1        
+def simulate_client_requests(load_balancer, num_requests):
+    strategies = ["random", "round_robin", "least_connections"]
+    for strategy in strategies:
+        print(f"\n---{strategy.upper()} STRATEGY ---")
+        for i in range(num_requests):
+            load_balancer.assign_request(strategy)            
+servers = ["server A", "Server B", "Server C"]
+load_balancer = LoadBalancer(servers)
+simulate_client_requests(load_balancer, 5)
+
+
+
+
+PB9:- Clonal Selection Algorithm
+import numpy as np
+def objective_function(x):
+    return np.sum(x**2)
+def clonal_selection_algorithm(num_antibodies, num_dimensions, search_space, num_generations, num_clones, clone_factor, mutation_rate):
+    antibodies = np.random.uniform(search_space[:, 0], search_space[:, 1], size=(num_antibodies, num_dimensions))
+    for generation in range(num_generations):
+        fitness = np.array([objective_function(antibody) for antibody in antibodies])
+        clones = np.repeat(antibodies, np.round(num_clones * (1 / (1 + fitness * clone_factor))).astype(int), axis=0)
+        mutation_mask = np.random.rand(*clones.shape) < mutation_rate
+        mutation_amounts = np.random.uniform(-0.5, 0.5, size=clones.shape) * (search_space[:, 1] - search_space[:, 0])
+        mutated_clones = np.clip(clones + mutation_mask * mutation_amounts, search_space[:, 0], search_space[:, 1])
+        combined_population = np.vstack((antibodies, mutated_clones))
+        fitness_combined = np.array([objective_function(antibody) for antibody in combined_population])
+        antibodies = combined_population[np.argsort(fitness_combined)][:num_antibodies]
+        
+    return antibodies[0]
+best_solution = clonal_selection_algorithm(50, 3, np.array([[-5,5]]* 3), 100, 10, 0.1, 0.1)
+print("Best Solution:", best_solution)
+print("Objective Value:",objective_function(best_solution))
+
+
+
+
+PB11:- Artificial immune pattern recognition
+from sklearn.neighbors import KNeighborsClassifier
+from sklearn.metrics import accuracy_score
+from sklearn.model_selection import train_test_split
+from sklearn import datasets
+iris = datasets.load_iris()
+X = iris.data
+y = iris.target
+X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.5, random_state=42)
+class AISClassifier:
+    def __init__(self, n_neighbors=10):
+        self.knn = KNeighborsClassifier(n_neighbors=n_neighbors)        
+    def fit(self, X_train, y_train):
+        self.knn.fit(X_train, y_train)        
+    def predict(self, X_test):
+        return self.knn.predict(X_test)    
+ais_clf = AISClassifier(n_neighbors=10)
+ais_clf.fit(X_train, y_train)
+y_pred = ais_clf.predict(X_test)
+accuracy = accuracy_score(y_test, y_pred)
+print("Accuracy:",accuracy)
+
+
+
+PB12:- DEAP
+!pip install deap
+import random
+from deap import base, creator, tools, algorithms
+def eval_func(individual):
+    return sum(x ** 2 for x in individual),
+creator.create("FitnessMin", base.Fitness, weights=(-1.0,)
+creator.create("Individual", list, fitness=creator.FitnessMin)
+toolbox = base.Toolbox()
+toolbox.register("attr_float", random.uniform, -5.0, 5.0)
+toolbox.register("individual", tools.initRepeat, creator.Individual, toolbox.attr_float, n=3)
+toolbox.register("population", tools.initRepeat, list, toolbox.individual)
+toolbox.register("mate", tools.cxBlend, alpha=0.5)
+toolbox.register("mutate", tools.mutGaussian, mu=0, sigma=1, indpb=0.2)
+toolbox.register("select", tools.selTournament, tournsize=3)
+toolbox.register("evaluate", eval_func)
+population = toolbox.population(n=50)
+algorithms.eaSimple(population, toolbox, cxpb=0.5, mutpb=0.1, ngen=20)
+best_ind = tools.selBest(population, k=1)[0]
+best_fitness = best_ind.fitness.values[0]
+print("Best Individual:", best_ind)
+print("Best Fitness:", best_fitness)
+
+
+
+PB13:- Ant Colony optimization(TSP)
+import numpy as np
+num_cities = 10
+num_ants = 100
+num_iterations = 1000
+alpha = 1
+beta = 2
+evaporation_rate = 0.1
+pheromone_matrix = np.ones((num_cities, num_cities))
+
+distance_matrix = np.random.randint(1, 100, size=(num_cities, num_cities))
+distance_matrix = (distance_matrix + distance_matrix.T) / 2
+np.fill_diagonal(distance_matrix, np.inf)
+# ACO algorithm
+best_tour = None
+best_tour_length = np.inf
+for iteration in range(num_iterations):
+    all_tours = []
+    all_lengths = []
+    for ant in range(num_ants):
+        tour = []
+        visited = set()
+        current_city = np.random.randint(0, num_cities)
+        tour.append(current_city)
+        visited.add(current_city)
+        for _ in range(num_cities - 1):
+            probabilities = []
+            for city in range(num_cities):
+                if city not in visited:
+                    pheromone = pheromone_matrix[current_city][city] ** alpha
+                    visibility = (1.0 / distance_matrix[current_city][city]) ** beta
+                    probabilities.append(pheromone * visibility)
+                else:
+                    probabilities.append(0)
+            probabilities = np.array(probabilities)
+            if probabilities.sum() == 0:
+                break  # Safeguard: no valid moves
+            probabilities /= probabilities.sum()
+            next_city = np.random.choice(num_cities, p=probabilities)
+            tour.append(next_city)
+            visited.add(next_city)
+            current_city = next_city
+        all_tours.append(tour)
+        length = sum(distance_matrix[tour[i]][tour[i+1]] for i in range(len(tour)-1))
+        all_lengths.append(length)
+        if length < best_tour_length:
+            best_tour_length = length
+            best_tour = tour
+    # Pheromone evaporation
+    pheromone_matrix *= (1 - evaporation_rate)
+    # Pheromone update
+    for tour, length in zip(all_tours, all_lengths):
+        for i in range(len(tour) - 1):
+            pheromone_matrix[tour[i]][tour[i+1]] += 1.0 / length
+            pheromone_matrix[tour[i+1]][tour[i]] += 1.0 / length  # symmetric update
+print("Best tour:", best_tour)
+print("Best tour length:", best_tour_length)
+
+
+
+PB14:- RPC(Factorial)
+Client:
+import xmlrpc.client
+def main():
+    server=xmlrpc.client.ServerProxy('http://localhost:8000')
+    n=int(input("Enter the Number:"))
+    result = server.calculate_factorial(n)
+    print(result)
+if __name__ == '__main__':
+    main()
+
+Server:
+from xmlrpc.server import SimpleXMLRPCServer
+def factorial(n):
+    if n==0 or n==1:
+        return 1
+    else:
+        return n*factorial(n-1)
+server = SimpleXMLRPCServer(('localhost',8000))
+server.register_function(factorial,'calculate_factorial')
+server.serve_forever()
+
+
+
+PB15:- MapReduce(CharCount & WordCount)
+CharCount:
+from mrjob.job import MRJob
+class MRCharCount(MRJob):
+    def mapper(self, _, line):
+        for char in line.strip():
+            yield char, 1
+    def reducer(self, char, counts):
+        yield char, sum(counts)
+        
+if __name__ == '__main__':
+    MRCharCount.run()
+
+WordCount:
+from mrjob.job import MRJob
+import re
+WORD_REGEXP = re.compile(r"[\w']+")
+class MRWordCount(MRJob):
+    def mapper(self, _, line):
+        for word in WORD_REGEXP.findall(line):
+            yield word.lower(), 1 
+    def reducer(self, word, counts):
+        yield word, sum(counts)
+if __name__ == '__main__':
+    MRWordCount.run()
+
+
+
+PB16:- RMI(String Concatenation)
+Client:
+import Pyro4
+uri = input("Enter URI of Server:")
+concatenator = Pyro4.Proxy(uri)
+str1 = input("Enter the string 1")
+str2 = input("Enter the string 2")
+result = concatenator.concatenate(str1, str2)
+print(result)
+
+Server:
+import Pyro4
+@Pyro4.expose
+class stringconcatenator:
+    def concatenate(self,str1,str2):
+        return str1+str2
+daemon=Pyro4.Daemon()
+uri=daemon.register(stringconcatenator)
+print(uri)
+daemon.requestLoop()
+
+
